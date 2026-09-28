@@ -1,0 +1,143 @@
+---
+title: "Quarto Exercise 6"
+author: "Jacob Green"
+format: html
+---
+
+```{r}
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(reactable)
+library(crosstalk)
+library(plotly)
+
+universities <- read.csv("https://manctsui.github.io/datasets/timesData.csv")
+```
+
+## Problem 1A
+
+Find the three countries with the most universities in the rankings.
+
+```{r}
+top_countries <- universities |>
+  count(country, name = "number_of_universities") |>
+  arrange(desc(number_of_universities)) |>
+  slice_head(n = 3)
+
+reactable(top_countries)
+```
+
+## Problem 1B
+
+Display the result from Problem 1A as a bar chart.
+
+```{r}
+ggplot(top_countries,
+       aes(x = reorder(country, number_of_universities),
+           y = number_of_universities)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    x = "Country",
+    y = "Number of Universities",
+    title = "Countries with the Most Universities in the Rankings"
+  )
+```
+
+## Problem 2A
+
+Display the top 50 universities in 2011 with only rank and university name.
+
+```{r}
+top_50_2011 <- universities |>
+  filter(year == 2011) |>
+  mutate(rank = as.numeric(gsub("=", "", world_rank))) |>
+  arrange(rank) |>
+  slice_head(n = 50) |>
+  select(rank, university_name)
+
+reactable(top_50_2011)
+```
+
+## Problem 2B
+
+The rank column would not be the best key for a SharedData object because a key should uniquely identify each row. Rankings can contain ties, so the same rank could appear more than once. The university name is a better choice because each university in this table is a separate observation.
+
+## Problem 2C
+
+Create a slider that filters universities by rank.
+
+```{r}
+shared_top_50 <- SharedData$new(
+  top_50_2011,
+  key = ~university_name
+)
+
+filter_slider(
+  id = "rank_filter",
+  label = "University Rank",
+  sharedData = shared_top_50,
+  column = ~rank
+)
+
+reactable(shared_top_50)
+```
+
+## Problem 3
+
+Create two linked scatterplots using the 2016 data.
+
+```{r}
+universities_2016 <- universities |>
+  filter(year == 2016) |>
+  mutate(
+    num_students = as.numeric(gsub(",", "", num_students)),
+    student_staff_ratio = as.numeric(student_staff_ratio),
+    teaching = as.numeric(teaching)
+  ) |>
+  drop_na(num_students, student_staff_ratio, teaching)
+
+shared_2016 <- SharedData$new(
+  universities_2016,
+  key = ~university_name,
+  group = "universities"
+)
+```
+
+### Number of Students vs. Student-Staff Ratio
+
+```{r}
+plot_ly(
+  shared_2016,
+  x = ~num_students,
+  y = ~student_staff_ratio,
+  type = "scatter",
+  mode = "markers",
+  text = ~university_name
+) |>
+  layout(
+    xaxis = list(title = "Number of Students"),
+    yaxis = list(title = "Student-Staff Ratio")
+  )
+```
+
+### Student-Staff Ratio vs. Teaching Score
+
+```{r}
+plot_ly(
+  shared_2016,
+  x = ~student_staff_ratio,
+  y = ~teaching,
+  type = "scatter",
+  mode = "markers",
+  text = ~university_name
+) |>
+  layout(
+    xaxis = list(title = "Student-Staff Ratio"),
+    yaxis = list(title = "Teaching Score")
+  )
+```
+
+
